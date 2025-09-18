@@ -40,14 +40,19 @@ jobs:
     steps:
       - name: Send Start Info
         run: |
+          ISO=${{ github.event.inputs.iso_url }}
+          VM_NAME=${{ github.event.inputs.vm_name }}
+          VCPUS=${{ github.event.inputs.vcpus }}
+          RAM=${{ github.event.inputs.ram }}
+          DISK=${{ github.event.inputs.disk }}
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d text="🚀 Starting VM Setup
-OS ISO: ${{ github.event.inputs.iso_url }}
-VM Name: ${{ github.event.inputs.vm_name }}
-vCPUs: ${{ github.event.inputs.vcpus }}
-RAM: ${{ github.event.inputs.ram }} GB
-Disk: ${{ github.event.inputs.disk }} GB (NVMe)"
+OS ISO: $ISO
+VM Name: $VM_NAME
+vCPUs: $VCPUS
+RAM: $RAM GB
+Disk: $DISK GB (NVMe)"
 
       - name: Setup Dependencies
         run: |
@@ -57,25 +62,28 @@ Disk: ${{ github.event.inputs.disk }} GB (NVMe)"
 
       - name: Download Windows ISO
         run: |
-          wget -O "${{ github.event.inputs.vm_name }}.iso" "${{ github.event.inputs.iso_url }}"
+          VM_NAME=${{ github.event.inputs.vm_name }}
+          ISO=${{ github.event.inputs.iso_url }}
+          wget -O "${VM_NAME}.iso" "$ISO"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d text="✅ ISO downloaded."
 
       - name: Create Disk
         run: |
-          qemu-img create -f qcow2 "${{ github.event.inputs.vm_name }}.qcow2" "${{ github.event.inputs.disk }}G"
+          VM_NAME=${{ github.event.inputs.vm_name }}
+          DISK=${{ github.event.inputs.disk }}
+          qemu-img create -f qcow2 "${VM_NAME}.qcow2" "${DISK}G"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="📦 Virtual NVMe disk created (${{
-              github.event.inputs.disk
-            }}G)."
+            -d text="📦 Virtual NVMe disk created (${DISK}G)."
 
       - name: Start Tailscale
         run: |
+          VM_NAME=${{ github.event.inputs.vm_name }}
           sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 &
           sleep 5
-          sudo tailscale up --authkey=$TAILSCALE_AUTHKEY --hostname="${{ github.event.inputs.vm_name }}" --accept-routes
+          sudo tailscale up --authkey=$TAILSCALE_AUTHKEY --hostname="$VM_NAME" --accept-routes
           TS_IP=$(tailscale ip -4 | head -n 1)
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
@@ -84,6 +92,9 @@ Disk: ${{ github.event.inputs.disk }} GB (NVMe)"
 
       - name: Launch VM and Hold Job
         run: |
+          VM_NAME=${{ github.event.inputs.vm_name }}
+          VCPUS=${{ github.event.inputs.vcpus }}
+          RAM=${{ github.event.inputs.ram }}
           if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
             CODE_PATH=/usr/share/OVMF/OVMF_CODE_4M.fd
             VARS_PATH=/usr/share/OVMF/OVMF_VARS_4M.fd
@@ -97,13 +108,13 @@ Disk: ${{ github.event.inputs.disk }} GB (NVMe)"
           sudo qemu-system-x86_64 \
             -enable-kvm \
             -cpu host \
-            -smp ${{ github.event.inputs.vcpus }} \
-            -m $(( ${{ github.event.inputs.ram }} * 1024 ))M \
+            -smp $VCPUS \
+            -m $((RAM*1024))M \
             -drive if=pflash,format=raw,readonly=on,file=$CODE_PATH \
             -drive if=pflash,format=raw,file=$VARS_PATH \
-            -drive file="${{ github.event.inputs.vm_name }}.qcow2",format=qcow2,if=none,id=nvme_disk \
+            -drive file="${VM_NAME}.qcow2",format=qcow2,if=none,id=nvme_disk \
             -device nvme,drive=nvme_disk,serial=deadbeef \
-            -cdrom "${{ github.event.inputs.vm_name }}.iso" \
+            -cdrom "${VM_NAME}.iso" \
             -boot d \
             -vnc :0 \
             -netdev user,id=net0,hostfwd=tcp::3389-:3389 \
@@ -115,6 +126,7 @@ Disk: ${{ github.event.inputs.disk }} GB (NVMe)"
 
           nohup websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
+          TS_IP=${{ github.env.TAILSCALE_IP }}
           VNC_LINK="http://$TS_IP:6080/vnc.html"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
