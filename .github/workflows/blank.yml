@@ -42,11 +42,12 @@ jobs:
 
     - name: Booting Virtual Computer
       run: |
+        cp /usr/share/OVMF/OVMF_VARS_4M.fd ./OVMF_VARS.fd
         DISPLAY=:0 qemu-system-x86_64 \
           -cdrom win.iso \
           -cpu qemu64 -smp cores=4 \
           -m 12288 \
-          -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+          -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
           -drive if=pflash,format=raw,file=OVMF_VARS.fd \
           -hda windows_disk.qcow2 \
           -boot d \
