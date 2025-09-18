@@ -1,0 +1,73 @@
+name: Windows-VirtualPC
+
+on:
+  workflow_dispatch:
+    inputs:
+      iso_url:
+        description: "Paste the direct ISO link for Windows"
+        required: true
+        type: string
+
+jobs:
+  run-vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+    - name: Powering On Virtual Computer
+      uses: actions/checkout@v4
+
+    - name: Installing Essential Hardware
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu-system-x86 qemu-utils x11vnc xvfb curl jq wget unzip ovmf
+
+    - name: Connecting to Virtual Network (Tailscale)
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=VirtualPC --ssh --accept-routes
+
+    - name: Creating 256GB Virtual Hard Drive
+      run: |
+        echo "Creating virtual disk of 256GB..."
+        qemu-img create -f qcow2 windows_disk.qcow2 256G
+
+    - name: Inserting Windows Installation Disk
+      run: |
+        wget -O win.iso "${{ github.event.inputs.iso_url }}"
+
+    - name: Powering Display Monitor
+      run: |
+        Xvfb :0 -screen 0 1920x1080x24 > xvfb.log 2>&1 &
+
+    - name: Booting Virtual Computer
+      run: |
+        DISPLAY=:0 qemu-system-x86_64 \
+          -cdrom win.iso \
+          -cpu qemu64 -smp cores=4 \
+          -m 12288 \
+          -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+          -drive if=pflash,format=raw,file=OVMF_VARS.fd \
+          -hda windows_disk.qcow2 \
+          -boot d \
+          -net nic -net user \
+          -vnc :0 \
+          -usb -device usb-tablet \
+          -vga std \
+          -daemonize
+
+    - name: Starting Remote Screen Sharing
+      run: |
+        x11vnc -display :0 -forever -nopw -listen 0.0.0.0 \
+          -xkb -noxrecord -noxfixes -noxdamage > x11vnc.log 2>&1 &
+
+    - name: Showing Virtual Computer IP Address
+      run: |
+        echo "=== Virtual Computer Network Address (Tailscale) ==="
+        tailscale ip -4
+        tailscale ip -6
+
+    - name: Keeping Virtual Computer Running
+      run: |
+        echo "Virtual Computer is running... connect using the Tailscale IP above in RealVNC (port 5900)"
+        sleep 18000
