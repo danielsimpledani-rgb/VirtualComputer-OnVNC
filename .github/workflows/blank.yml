@@ -47,12 +47,7 @@ jobs:
           DISK="${{ github.event.inputs.disk }}"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="🚀 Starting VM Setup
-OS ISO: $ISO
-VM Name: $VM_NAME
-vCPUs: $VCPUS
-RAM: $RAM GB
-Disk: $DISK GB (NVMe)"
+            -d text="🚀 Starting VM Setup\nOS ISO: $ISO\nVM Name: $VM_NAME\nvCPUs: $VCPUS\nRAM: $RAM GB\nDisk: $DISK GB (NVMe)"
 
       - name: Setup Dependencies
         run: |
@@ -127,14 +122,10 @@ Disk: $DISK GB (NVMe)"
 
           nohup websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
-          # Use bash variable only
           VNC_LINK="http://$TAILSCALE_IP:6080/vnc.html"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="🚀 VM Started!
-Tailscale IP: $TAILSCALE_IP
-noVNC: $VNC_LINK
-Owner: @Danielreal64"
+            -d text="🚀 VM Started!\nTailscale IP: $TAILSCALE_IP\nnoVNC: $VNC_LINK\nOwner: @Danielreal64"
 
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
