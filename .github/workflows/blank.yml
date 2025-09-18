@@ -95,6 +95,7 @@ Disk: $DISK GB (NVMe)"
           VM_NAME=${{ github.event.inputs.vm_name }}
           VCPUS=${{ github.event.inputs.vcpus }}
           RAM=${{ github.event.inputs.ram }}
+
           if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
             CODE_PATH=/usr/share/OVMF/OVMF_CODE_4M.fd
             VARS_PATH=/usr/share/OVMF/OVMF_VARS_4M.fd
@@ -126,12 +127,11 @@ Disk: $DISK GB (NVMe)"
 
           nohup websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
-          TS_IP=${{ github.env.TAILSCALE_IP }}
-          VNC_LINK="http://$TS_IP:6080/vnc.html"
+          VNC_LINK="http://$TAILSCALE_IP:6080/vnc.html"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d text="🚀 VM Started!
-Tailscale IP: $TS_IP
+Tailscale IP: $TAILSCALE_IP
 noVNC: $VNC_LINK
 Owner: @Danielreal64"
 
