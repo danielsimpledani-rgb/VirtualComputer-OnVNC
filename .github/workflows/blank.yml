@@ -40,11 +40,11 @@ jobs:
     steps:
       - name: Send Start Info
         run: |
-          ISO=${{ github.event.inputs.iso_url }}
-          VM_NAME=${{ github.event.inputs.vm_name }}
-          VCPUS=${{ github.event.inputs.vcpus }}
-          RAM=${{ github.event.inputs.ram }}
-          DISK=${{ github.event.inputs.disk }}
+          ISO="${{ github.event.inputs.iso_url }}"
+          VM_NAME="${{ github.event.inputs.vm_name }}"
+          VCPUS="${{ github.event.inputs.vcpus }}"
+          RAM="${{ github.event.inputs.ram }}"
+          DISK="${{ github.event.inputs.disk }}"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d text="🚀 Starting VM Setup
@@ -62,8 +62,8 @@ Disk: $DISK GB (NVMe)"
 
       - name: Download Windows ISO
         run: |
-          VM_NAME=${{ github.event.inputs.vm_name }}
-          ISO=${{ github.event.inputs.iso_url }}
+          VM_NAME="${{ github.event.inputs.vm_name }}"
+          ISO="${{ github.event.inputs.iso_url }}"
           wget -O "${VM_NAME}.iso" "$ISO"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
@@ -71,8 +71,8 @@ Disk: $DISK GB (NVMe)"
 
       - name: Create Disk
         run: |
-          VM_NAME=${{ github.event.inputs.vm_name }}
-          DISK=${{ github.event.inputs.disk }}
+          VM_NAME="${{ github.event.inputs.vm_name }}"
+          DISK="${{ github.event.inputs.disk }}"
           qemu-img create -f qcow2 "${VM_NAME}.qcow2" "${DISK}G"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
@@ -80,7 +80,7 @@ Disk: $DISK GB (NVMe)"
 
       - name: Start Tailscale
         run: |
-          VM_NAME=${{ github.event.inputs.vm_name }}
+          VM_NAME="${{ github.event.inputs.vm_name }}"
           sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 &
           sleep 5
           sudo tailscale up --authkey=$TAILSCALE_AUTHKEY --hostname="$VM_NAME" --accept-routes
@@ -92,9 +92,9 @@ Disk: $DISK GB (NVMe)"
 
       - name: Launch VM and Hold Job
         run: |
-          VM_NAME=${{ github.event.inputs.vm_name }}
-          VCPUS=${{ github.event.inputs.vcpus }}
-          RAM=${{ github.event.inputs.ram }}
+          VM_NAME="${{ github.event.inputs.vm_name }}"
+          VCPUS="${{ github.event.inputs.vcpus }}"
+          RAM="${{ github.event.inputs.ram }}"
 
           if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
             CODE_PATH=/usr/share/OVMF/OVMF_CODE_4M.fd
@@ -109,10 +109,10 @@ Disk: $DISK GB (NVMe)"
           sudo qemu-system-x86_64 \
             -enable-kvm \
             -cpu host \
-            -smp $VCPUS \
+            -smp "$VCPUS" \
             -m $((RAM*1024))M \
-            -drive if=pflash,format=raw,readonly=on,file=$CODE_PATH \
-            -drive if=pflash,format=raw,file=$VARS_PATH \
+            -drive if=pflash,format=raw,readonly=on,file="$CODE_PATH" \
+            -drive if=pflash,format=raw,file="$VARS_PATH" \
             -drive file="${VM_NAME}.qcow2",format=qcow2,if=none,id=nvme_disk \
             -device nvme,drive=nvme_disk,serial=deadbeef \
             -cdrom "${VM_NAME}.iso" \
@@ -127,6 +127,7 @@ Disk: $DISK GB (NVMe)"
 
           nohup websockify --web=/usr/share/novnc 6080 localhost:5900 &
 
+          # Use bash variable only
           VNC_LINK="http://$TAILSCALE_IP:6080/vnc.html"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
